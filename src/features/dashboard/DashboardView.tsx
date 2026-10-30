@@ -53,21 +53,28 @@ export function DashboardView({
     <div className="space-y-6">
       {/* Welcome Banner */}
       <div className="p-6 bg-gradient-to-r from-brand-surface via-brand-card to-brand-surface border border-brand-border rounded-3xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-sky-400">
-            <Calendar className="w-3.5 h-3.5" />
-            <span>{formatDateBr(getTodayDateString())}</span>
+        <div className="flex items-center gap-4">
+          <img 
+            src="/icons/icon-192x192.png" 
+            alt="RotaPro" 
+            className="w-16 h-16 rounded-2xl shadow-lg border border-brand-border/60 shrink-0" 
+          />
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-sky-400">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{formatDateBr(getTodayDateString())}</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white mt-0.5">
+              Meu Dia de Trabalho
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
+              {isRunning
+                ? 'Jornada em andamento. Registros e cronômetros ativos.'
+                : isCompleted
+                ? 'Jornada do dia finalizada com sucesso!'
+                : 'Nenhuma jornada iniciada hoje. Prepare sua rota para começar.'}
+            </p>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
-            Meu Dia de Trabalho
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-300 mt-1">
-            {isRunning
-              ? 'Jornada em andamento. Registros e cronômetros ativos.'
-              : isCompleted
-              ? 'Jornada do dia finalizada com sucesso!'
-              : 'Nenhuma jornada iniciada hoje. Prepare sua rota para começar.'}
-          </p>
         </div>
 
         {/* Status Pill */}
