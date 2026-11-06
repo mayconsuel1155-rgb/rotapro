@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { EnrichedJourney } from '../../types';
 import { Modal } from '../ui/Modal';
+import { OfflineStatus } from './OfflineStatus';
 
 export type TabType = 'dashboard' | 'clients' | 'planning' | 'journey' | 'reports';
 
@@ -37,6 +38,7 @@ export function AppLayout({
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [installError, setInstallError] = useState('');
 
   useEffect(() => {
     const handleBeforeInstall = (e: Event) => {
@@ -47,6 +49,7 @@ export function AppLayout({
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setDeferredPrompt(null);
+      setIsInstallModalOpen(false);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
@@ -66,13 +69,22 @@ export function AppLayout({
   }, []);
 
   const handleInstallClick = async () => {
+    setInstallError('');
     if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choiceResult = await deferredPrompt.userChoice;
-      if (choiceResult.outcome === 'accepted') {
-        setIsInstalled(true);
+      try {
+        await deferredPrompt.prompt();
+        const choiceResult = await deferredPrompt.userChoice;
+        if (choiceResult.outcome === 'accepted') {
+          // Accepting the prompt does not confirm that Android installed the app.
+          // Only appinstalled (or standalone display mode) confirms installation.
+          setIsInstallModalOpen(true);
+        }
+      } catch {
+        setInstallError('O navegador não conseguiu iniciar a instalação. Confira as orientações abaixo.');
+        setIsInstallModalOpen(true);
+      } finally {
+        setDeferredPrompt(null);
       }
-      setDeferredPrompt(null);
     } else {
       setIsInstallModalOpen(true);
     }
@@ -126,11 +138,11 @@ export function AppLayout({
           <div className="flex items-center gap-2 sm:gap-3">
             {/* 100% Offline Badge */}
             <div 
-              title="Todos os dados ficam armazenados localmente no seu dispositivo. Não requer internet."
+              title="Dados salvos neste aparelho, com sincronização quando o computador estiver acessível."
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-700/60 text-xs text-slate-300 font-medium"
             >
               <WifiOff className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden xs:inline">100% Offline</span>
+              <span className="hidden xs:inline">Dados locais</span>
             </div>
 
             {/* Install App Button */}
@@ -194,6 +206,7 @@ export function AppLayout({
       </header>
 
       {/* Main Content Area */}
+      <OfflineStatus />
       <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 pb-24 md:pb-8">
         {children}
       </main>
@@ -239,6 +252,14 @@ export function AppLayout({
         title="Instalar RotaPro no seu Dispositivo"
       >
         <div className="space-y-4">
+          {installError && <p role="alert" className="text-sm text-amber-300">{installError}</p>}
+          {!window.isSecureContext && (
+            <div role="alert" className="p-3 rounded-xl border border-amber-500/50 text-xs text-amber-200 space-y-2">
+              <p>A instalação offline precisa de uma conexão HTTPS confiável.</p>
+              <p>Abra o endereço HTTPS do sistema e instale o certificado do seu computador como certificado de CA. A página deve abrir sem aviso de segurança.</p>
+            </div>
+          )}
+          {import.meta.env.DEV && <p className="text-xs text-amber-200">Você abriu a versão de desenvolvimento. Para instalar no telefone, abra a versão HTTPS do sistema na porta 8443.</p>}
           <div className="flex items-center gap-3 p-3 bg-brand-bg rounded-xl border border-brand-border">
             <img src="/icons/icon-192x192.png" alt="RotaPro" className="w-12 h-12 rounded-xl shrink-0" />
             <div>
@@ -255,10 +276,18 @@ export function AppLayout({
             </h5>
             <ol className="text-xs text-slate-300 list-decimal list-inside space-y-1.5 leading-relaxed">
               <li>Abra esta página no <strong>Google Chrome</strong>.</li>
+              <li>Confirme que está no endereço <strong>HTTPS</strong>, sem aviso de certificado, e aguarde <strong>Disponível offline neste aparelho</strong>.</li>
               <li>Toque no menu de <strong>3 pontinhos</strong> (canto superior direito).</li>
               <li>Selecione <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.</li>
               <li>Confirme. O ícone do RotaPro aparecerá na grade de aplicativos do seu celular.</li>
             </ol>
+          </div>
+
+          <div className="p-3.5 bg-brand-surface rounded-xl border border-brand-border space-y-2 text-xs text-slate-300">
+            <h5 className="font-semibold text-white">Se o Android disser que não é possível instalar</h5>
+            <p>A instalação pelo Chrome pode falhar em endereços da rede local. No menu do navegador, procure <strong>Adicionar à tela inicial → Criar atalho</strong>, se essa opção estiver disponível.</p>
+            <p>Outra opção é abrir este mesmo endereço no <strong>Firefox ou Edge para Android</strong> e usar <strong>Adicionar à tela inicial</strong>. Nesse navegador, aguarde novamente a confirmação de uso offline antes de criar o atalho.</p>
+            <p>O atalho depende dos dados salvos pelo navegador. Teste abrir em modo avião antes de sair da rede. Se trocar de navegador, exporte e importe um backup ou faça o pareamento para recuperar seus registros.</p>
           </div>
 
           {/* Windows instructions */}

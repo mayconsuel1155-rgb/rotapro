@@ -1,5 +1,7 @@
 # RotaPro — Gestão de Atendimento Externo
 
+> **Uso no telefone:** siga [Uso offline e sincronização local](USO_NO_TELEFONE.md). A instalação offline no celular exige a versão compilada por HTTPS com certificado confiável. O servidor local e a sincronização são iniciados por `npm start`. Os endereços HTTP de desenvolvimento/preview abaixo não permitem instalar o recurso offline pela rede no telefone.
+
 **Versão:** 1.0 (MVP Funcional Offline-First)  
 **Público-alvo:** Profissionais de campo, representantes, técnicos e consultores externos.  
 **Plataformas:** Android e Windows (PWA Instalável 100% Offline).
@@ -114,7 +116,7 @@ Resultados cobertos pelos testes:
 ## 📱 Como Instalar no Android
 
 1. Abra o navegador **Google Chrome** no smartphone Android.
-2. Acesse o endereço do aplicativo (seja na rede local `http://<IP-DO-PC>:4173/` ou hospedado em seu ambiente local).
+2. Siga [Uso offline e sincronização local](USO_NO_TELEFONE.md) para configurar o certificado e abrir o endereço HTTPS do aplicativo. HTTP pelo IP da rede não permite ativar o modo offline no telefone.
 3. Toque no ícone de **3 pontos** (canto superior direito) do Chrome.
 4. Toque em **"Instalar aplicativo"** ou **"Adicionar à tela inicial"**.
 5. O ícone do **RotaPro** será criado na grade de aplicativos do seu Android.

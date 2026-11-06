@@ -66,7 +66,7 @@ export function BackupModal({ isOpen, onClose, onDataChanged }: BackupModalProps
   };
 
   const handleClearAll = async () => {
-    if (window.confirm('ATENÇÃO: Deseja realmente apagar TODOS os dados do RotaPro neste dispositivo? Essa ação não pode ser desfeita.')) {
+    if (window.confirm('ATENÇÃO: Deseja apagar TODOS os dados? Se o aparelho estiver pareado, as exclusões também serão enviadas ao computador e aos outros aparelhos na próxima sincronização. Exporte um backup antes de continuar.')) {
       await backupRepository.clearAllData();
       showToast('Todos os dados foram excluídos.', 'info');
       onDataChanged();
@@ -88,7 +88,7 @@ export function BackupModal({ isOpen, onClose, onDataChanged }: BackupModalProps
         <div className="p-3.5 bg-slate-900/80 border border-slate-700/60 rounded-xl flex items-start gap-3">
           <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
           <p className="text-xs text-slate-300 leading-relaxed">
-            Seus dados são <strong>100% privados e locais</strong>. O RotaPro não envia nada para a internet. 
+            Seus dados ficam <strong>salvos neste aparelho</strong> e, quando pareado, são sincronizados com seu computador pela rede local.
             Exporte cópias periódicas para proteger seus registros em caso de perda ou troca de aparelho.
           </p>
         </div>

@@ -2,6 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import type { Client, Journey, JourneyStop, JourneyEvent } from '../types';
 
 export class RotaProDatabase extends Dexie {
+  syncState!: Table<{ id: string; value: unknown }, string>;
   clients!: Table<Client, string>;
   journeys!: Table<Journey, string>;
   stops!: Table<JourneyStop, string>;
@@ -16,6 +17,7 @@ export class RotaProDatabase extends Dexie {
       stops: 'id, journeyId, clientId, position, status',
       events: 'id, journeyId, stopId, type, occurredAt'
     });
+    this.version(2).stores({ syncState: 'id' });
   }
 }
 

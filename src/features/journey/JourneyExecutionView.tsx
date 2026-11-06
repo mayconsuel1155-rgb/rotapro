@@ -23,6 +23,7 @@ import { useRealtimeTimer } from '../../hooks/useRealtimeTimer';
 import { useToast } from '../../components/ui/Toast';
 import { Modal } from '../../components/ui/Modal';
 import { formatTime24h, formatDurationHuman, formatDateBr } from '../../domain/time/timeService';
+import { WazeLink } from './WazeLink';
 
 interface JourneyExecutionViewProps {
   journey: EnrichedJourney | undefined;
@@ -49,6 +50,25 @@ export function JourneyExecutionView({
   const [stopNotes, setStopNotes] = useState('');
 
   const [isFinishing, setIsFinishing] = useState(false);
+  const [companyAddress, setCompanyAddress] = useState(() => localStorage.getItem('rotapro-company-address') || '');
+  const [companyAddressDraft, setCompanyAddressDraft] = useState(companyAddress);
+
+  const handleSaveCompanyAddress = (event: React.FormEvent) => {
+    event.preventDefault();
+    const address = companyAddressDraft.trim();
+    if (!address) {
+      showToast('Informe o endereço completo da empresa.', 'error');
+      return;
+    }
+    try {
+      localStorage.setItem('rotapro-company-address', address);
+      setCompanyAddress(address);
+      setCompanyAddressDraft(address);
+      showToast('Endereço da empresa salvo neste aparelho.', 'success');
+    } catch {
+      showToast('Não foi possível salvar o endereço neste aparelho.', 'error');
+    }
+  };
 
   // Identify active stop (traveling, arrived, or servicing)
   const activeStop = journey?.stops.find(s => ['traveling', 'arrived', 'servicing'].includes(s.status));
@@ -82,7 +102,9 @@ export function JourneyExecutionView({
     if (!journey || !emergencyClientId) return;
     try {
       await journeyRepository.addEmergencyStop(journey.id, emergencyClientId, emergencyMinutes);
-      showToast('Cliente urgente adicionado à rota com sucesso!', 'success');
+      showToast(activeStop?.isReturnToBase
+        ? 'Rota alterada! Deslocamento para a emergência iniciado.'
+        : 'Cliente urgente adicionado à rota com sucesso!', 'success');
       setIsEmergencyModalOpen(false);
       onRefresh();
     } catch (err: any) {
@@ -157,7 +179,7 @@ export function JourneyExecutionView({
     if (window.confirm('Deseja realmente encerrar a jornada agora? Todas as visitas não concluídas serão registradas no histórico.')) {
       setIsFinishing(true);
       try {
-        const returnStop = journey.stops.find(s => s.isReturnToBase);
+        const returnStop = journey.stops.find(s => s.isReturnToBase && s.status !== 'cancelled');
         await journeyRepository.finishJourney(journey.id, returnStop?.id);
         showToast('Jornada encerrada.', 'info');
         onRefresh();
@@ -343,7 +365,7 @@ export function JourneyExecutionView({
             className="flex-1 sm:flex-initial px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>+ Cliente Urgente</span>
+            <span>{activeStop?.isReturnToBase ? 'Desviar para Emergência' : '+ Cliente Urgente'}</span>
           </button>
           <button
             onClick={handleForceFinishJourney}
@@ -355,6 +377,23 @@ export function JourneyExecutionView({
           </button>
         </div>
       </div>
+
+      <details className="p-4 bg-brand-surface border border-brand-border rounded-2xl">
+        <summary className="text-sm font-semibold text-sky-300 cursor-pointer">Waze · Endereço da empresa</summary>
+        <form onSubmit={handleSaveCompanyAddress} className="mt-4 space-y-3">
+          <label htmlFor="company-navigation-address" className="block text-xs text-slate-300">Endereço completo para o retorno</label>
+          <input
+            id="company-navigation-address"
+            value={companyAddressDraft}
+            onChange={event => setCompanyAddressDraft(event.target.value)}
+            placeholder="Rua, número, bairro, cidade e estado"
+            required
+            className="w-full px-3.5 py-2.5 bg-brand-input border border-brand-border rounded-xl text-sm text-white focus:outline-none focus:border-brand-primary"
+          />
+          <p className="text-xs text-slate-400">Salvo neste aparelho. O Waze usa sua posição atual como ponto de partida, inclusive após uma emergência. Confira o destino antes de navegar.</p>
+          <button type="submit" className="px-4 py-2 bg-brand-primary hover:bg-brand-primaryHover text-white rounded-xl text-sm font-semibold">Salvar endereço da empresa</button>
+        </form>
+      </details>
 
       {/* ACTIVE STAGE CARD (THE HERO INTERACTION) */}
       {activeStop ? (
@@ -395,7 +434,7 @@ export function JourneyExecutionView({
             </h2>
             <div className="flex items-start gap-1.5 text-sm text-slate-300 mt-2">
               <MapPin className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-              <span>{activeStop.isReturnToBase ? 'Retornando à base de encerramento' : activeStop.client?.address}</span>
+              <span>{activeStop.isReturnToBase ? companyAddress || 'Cadastre o endereço da empresa acima para navegar no Waze' : activeStop.client?.address}</span>
             </div>
             {activeStop.client?.phone && (
               <div className="flex items-center gap-1.5 text-xs text-emerald-400 mt-2">
@@ -432,6 +471,9 @@ export function JourneyExecutionView({
 
           {/* GIANT ACTION BUTTON */}
           <div className="space-y-3">
+            {activeStop.status === 'traveling' && (
+              <WazeLink address={activeStop.isReturnToBase ? companyAddress : activeStop.client?.address} />
+            )}
             {activeStop.status === 'traveling' && !activeStop.isReturnToBase && (
               <button
                 onClick={() => handleArrive(activeStop)}
@@ -504,7 +546,7 @@ export function JourneyExecutionView({
               {nextPendingStop.isReturnToBase ? 'Retornar à Empresa' : nextPendingStop.client?.name}
             </h3>
             <p className="text-sm text-slate-300 mt-1">
-              {nextPendingStop.isReturnToBase ? 'Encerre o dia voltando à sede' : nextPendingStop.client?.address}
+              {nextPendingStop.isReturnToBase ? companyAddress || 'Encerre o dia voltando à sede' : nextPendingStop.client?.address}
             </p>
           </div>
 
@@ -609,7 +651,9 @@ export function JourneyExecutionView({
           <div className="p-3 bg-amber-950/40 border border-amber-600/40 rounded-xl flex items-start gap-2.5">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-200 leading-relaxed">
-              O cliente será incluído imediatamente na fila de visitas de hoje sem interromper a medição atual.
+              {activeStop?.isReturnToBase
+                ? 'O retorno será interrompido e o deslocamento para a emergência começará agora. O tempo já percorrido será preservado. Após o atendimento, você poderá iniciar o retorno à empresa novamente.'
+                : 'O cliente será incluído imediatamente na fila de visitas de hoje sem interromper a medição atual.'}
             </p>
           </div>
 
@@ -655,7 +699,7 @@ export function JourneyExecutionView({
               onClick={handleAddEmergencyStop}
               className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-sm transition-colors"
             >
-              Adicionar à Fila
+              {activeStop?.isReturnToBase ? 'Desviar e Iniciar Deslocamento' : 'Adicionar à Fila'}
             </button>
           </div>
         </div>

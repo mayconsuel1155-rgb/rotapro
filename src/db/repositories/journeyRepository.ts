@@ -281,39 +281,68 @@ export const journeyRepository = {
     plannedMinutes = 30
   ): Promise<JourneyStop> {
     const now = getNowIso();
-    const stops = await db.stops.where('journeyId').equals(journeyId).toArray();
-    
-    // Find return stop or last position
-    const returnStop = stops.find(s => s.isReturnToBase);
-    const returnPos = returnStop ? returnStop.position : stops.length + 1;
+    return db.transaction('rw', [db.journeys, db.stops, db.events], async () => {
+      const journey = await db.journeys.get(journeyId);
+      if (!journey || journey.status !== 'in_progress') {
+        throw new Error('A jornada precisa estar em andamento para adicionar uma emergência.');
+      }
+      const stops = await db.stops.where('journeyId').equals(journeyId).toArray();
+      const returnStop = stops.find(s => s.isReturnToBase && s.status !== 'cancelled');
+      const diverting = returnStop?.status === 'traveling';
+      const returnPos = returnStop ? returnStop.position : Math.max(0, ...stops.map(s => s.position)) + 1;
+      const newStop: JourneyStop = {
+        id: `stop_${journeyId}_emg_${crypto.randomUUID()}`,
+        journeyId,
+        clientId,
+        position: returnPos + (diverting ? 1 : 0),
+        status: diverting ? 'traveling' : 'pending',
+        ...(diverting ? { travelStartedAt: now } : {}),
+        plannedServiceMinutes: plannedMinutes,
+        isReturnToBase: false
+      };
 
-    // The new stop takes returnPos, and returnPos increments
-    const newStop: JourneyStop = {
-      id: `stop_${journeyId}_emg_${Date.now()}`,
-      journeyId,
-      clientId,
-      position: returnPos,
-      status: 'pending',
-      plannedServiceMinutes: plannedMinutes,
-      isReturnToBase: false
-    };
-
-    await db.transaction('rw', [db.stops, db.events], async () => {
+      if (diverting) {
+        // Keep the interrupted leg in history so its travel time is never lost.
+        await db.stops.add({
+          ...returnStop,
+          id: `${returnStop.id}_interrupted_${crypto.randomUUID()}`,
+          status: 'cancelled',
+          travelEndedAt: now,
+          notes: 'Retorno interrompido para atendimento de emergência.'
+        });
+        await db.events.add({
+          id: 'event_' + crypto.randomUUID(), journeyId, stopId: returnStop.id,
+          type: 'TRAVEL_END', occurredAt: now,
+          metadata: { reason: 'emergency_diversion', emergencyStopId: newStop.id }
+        });
+      }
       if (returnStop) {
-        await db.stops.update(returnStop.id, { position: returnPos + 1 });
+        await db.stops.update(returnStop.id, {
+          position: newStop.position + 1,
+          ...(diverting ? {
+            status: 'pending' as const,
+            travelStartedAt: undefined, travelEndedAt: undefined, arrivedAt: undefined
+          } : {})
+        });
       }
       await db.stops.add(newStop);
       await db.events.add({
-        id: 'event_' + Date.now(),
+        id: 'event_' + crypto.randomUUID(),
         journeyId,
         stopId: newStop.id,
         type: 'STOP_ADDED',
         occurredAt: now,
-        metadata: { emergency: true }
+        metadata: { emergency: true, divertedFromReturn: diverting }
       });
+      if (diverting) {
+        await db.events.add({
+          id: 'event_' + crypto.randomUUID(), journeyId, stopId: newStop.id,
+          type: 'TRAVEL_START', occurredAt: now
+        });
+      }
+      await db.journeys.update(journeyId, { updatedAt: now });
+      return newStop;
     });
-
-    return newStop;
   },
 
   async reorderPendingStops(journeyId: string, pendingStopIdsInOrder: string[]): Promise<void> {
@@ -331,7 +360,7 @@ export const journeyRepository = {
       }
 
       // Keep returnToBase at the end
-      const returnStop = allStops.find(s => s.isReturnToBase);
+      const returnStop = allStops.find(s => s.isReturnToBase && s.status !== 'cancelled');
       if (returnStop) {
         await db.stops.update(returnStop.id, { position: nextPos });
       }

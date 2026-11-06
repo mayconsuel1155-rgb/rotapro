@@ -1,0 +1,81 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { db } from '../db/database';
+import { journeyRepository } from '../db/repositories/journeyRepository';
+
+describe('emergência durante o retorno', () => {
+  beforeEach(async () => {
+    await db.journeys.clear();
+    await db.stops.clear();
+    await db.events.clear();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-05T10:00:00Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+  const time = (minutes: number) => vi.setSystemTime(new Date(Date.parse('2026-11-05T10:00:00Z') + minutes * 60000));
+
+  it('desvia sem encerrar a jornada, preserva o percurso e permite outro retorno e emergência', async () => {
+    const id = await journeyRepository.createDailyPlanning([]);
+    time(1);
+    await journeyRepository.startJourney(id);
+    const returnStop = (await journeyRepository.getEnrichedById(id))!.stops[0];
+    time(2);
+    await journeyRepository.startReturnTravel(id, returnStop.id);
+    time(12);
+    const emergency = await journeyRepository.addEmergencyStop(id, 'emergency-client');
+    let journey = (await journeyRepository.getEnrichedById(id))!;
+    expect(journey.status).toBe('in_progress');
+    expect(journey.endedAt).toBeUndefined();
+    expect(journey.stops.filter(s => s.status === 'traveling').map(s => s.id)).toEqual([emergency.id]);
+    expect(journey.stops.find(s => s.id === returnStop.id)?.status).toBe('pending');
+    expect(journey.stops.find(s => s.id === returnStop.id)?.travelStartedAt).toBeUndefined();
+    const interrupted = journey.stops.find(s => s.isReturnToBase && s.status === 'cancelled')!;
+    expect(interrupted.arrivedAt).toBeUndefined();
+    expect(interrupted.travelEndedAt).toBe(new Date().toISOString());
+    expect(journey.stats.totalTravelSeconds).toBe(600);
+    time(17);
+    await journeyRepository.arriveAtStop(id, emergency.id);
+    time(18);
+    await journeyRepository.startService(id, emergency.id);
+    time(28);
+    await journeyRepository.endService(id, emergency.id);
+    time(29);
+    await journeyRepository.startReturnTravel(id, returnStop.id);
+    time(32);
+    const second = await journeyRepository.addEmergencyStop(id, 'another-client');
+    journey = (await journeyRepository.getEnrichedById(id))!;
+    expect(journey.stops.filter(s => s.status === 'traveling').map(s => s.id)).toEqual([second.id]);
+    expect(journey.stats.totalTravelSeconds).toBe(18 * 60);
+    time(33);
+    await journeyRepository.arriveAtStop(id, second.id);
+    time(34);
+    await journeyRepository.startService(id, second.id);
+    time(35);
+    await journeyRepository.endService(id, second.id);
+    time(36);
+    await journeyRepository.startReturnTravel(id, returnStop.id);
+    time(40);
+    await journeyRepository.finishJourney(id, returnStop.id);
+    journey = (await journeyRepository.getEnrichedById(id))!;
+    expect(journey.status).toBe('completed');
+    expect(journey.stats.totalStops).toBe(2);
+    expect(journey.stats.completedStops).toBe(2);
+    expect(journey.stats.cancelledStops).toBe(0);
+    expect(journey.stats.totalTravelSeconds).toBe(23 * 60);
+    expect(journey.stats.totalServiceSeconds).toBe(11 * 60);
+  });
+
+  it('mantém o deslocamento normal ativo ao adicionar uma emergência à fila', async () => {
+    const id = await journeyRepository.createDailyPlanning([{ clientId: 'normal-client' }]);
+    time(1);
+    await journeyRepository.startJourney(id);
+    const stop = (await journeyRepository.getEnrichedById(id))!.stops[0];
+    time(2);
+    await journeyRepository.startTravel(id, stop.id);
+    time(3);
+    const emergency = await journeyRepository.addEmergencyStop(id, 'emergency-client');
+    const journey = (await journeyRepository.getEnrichedById(id))!;
+    expect(emergency.status).toBe('pending');
+    expect(journey.stops.filter(s => s.status === 'traveling').map(s => s.id)).toEqual([stop.id]);
+    expect(journey.stops[journey.stops.length - 1]?.isReturnToBase).toBe(true);
+  });
+});

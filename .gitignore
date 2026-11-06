@@ -12,3 +12,5 @@ dist-ssr
 *.sln
 *.sw?
 tsconfig.tsbuildinfo
+.certs/
+.local-data/

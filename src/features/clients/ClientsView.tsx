@@ -57,6 +57,8 @@ export function ClientsView() {
 
   useEffect(() => {
     loadClients();
+    window.addEventListener('rotapro-data-synced', loadClients);
+    return () => window.removeEventListener('rotapro-data-synced', loadClients);
   }, []);
 
   const filteredClients = useMemo(() => {

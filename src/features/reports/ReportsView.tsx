@@ -29,6 +29,8 @@ export function ReportsView() {
       setJourneys(all);
     };
     load();
+    window.addEventListener('rotapro-data-synced', load);
+    return () => window.removeEventListener('rotapro-data-synced', load);
   }, []);
 
   const filteredJourneys = useMemo(() => {
@@ -344,7 +346,7 @@ export function ReportsView() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="w-5 h-5 rounded-full bg-slate-800 text-[10px] font-bold text-slate-300 flex items-center justify-center">
-                            {stop.isReturnToBase ? 'Fim' : i + 1}
+                            {stop.isReturnToBase ? (stop.status === 'cancelled' ? '↪' : 'Fim') : i + 1}
                           </span>
                           <span className="font-semibold text-white text-sm">
                             {stop.isReturnToBase ? 'Retorno à Empresa' : stop.client?.name}
@@ -355,7 +357,7 @@ export function ReportsView() {
                             ? 'bg-emerald-950 text-emerald-300 border border-emerald-600/40'
                             : 'bg-amber-950 text-amber-300 border border-amber-600/40'
                         }`}>
-                          {stop.status === 'completed' ? 'Concluído' : 'Pulado / Pendente'}
+                          {stop.isReturnToBase && stop.status === 'cancelled' ? 'Interrompido por emergência' : stop.status === 'completed' ? 'Concluído' : 'Pulado / Pendente'}
                         </span>
                       </div>
 

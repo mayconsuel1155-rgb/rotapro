@@ -4,6 +4,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "setup:local": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/setup-local.ps1",
+    "start": "npm run build && node scripts/serve-local.mjs",
+    "serve:local": "node scripts/serve-local.mjs",
+    "test:server": "node --test scripts/sync-store.test.mjs",
+    "test:offline": "node scripts/check-offline.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",

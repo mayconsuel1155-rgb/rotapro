@@ -8,7 +8,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
+      injectRegister: false,
       includeAssets: [
         'favicon.svg',
         'favicon-32x32.png',
@@ -61,18 +62,10 @@ export default defineConfig({
         ]
       },
       workbox: {
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,json}'],
         navigateFallback: 'index.html',
-        runtimeCaching: [
-          {
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'rotapro-pages',
-              networkTimeoutSeconds: 3
-            }
-          }
-        ]
+        navigateFallbackDenylist: [/^\/api\//],
       }
     })
   ],
@@ -82,6 +75,7 @@ export default defineConfig({
     }
   },
   test: {
+    include: ['src/**/*.test.{ts,tsx}'],
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/tests/setup.ts'

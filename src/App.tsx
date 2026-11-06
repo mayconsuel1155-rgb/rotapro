@@ -21,7 +21,7 @@ export function AppContent() {
 
   const loadAppState = useCallback(async () => {
     try {
-      await seedInitialDataIfEmpty();
+      if (import.meta.env.DEV) await seedInitialDataIfEmpty();
       const todayJourney = await journeyRepository.getTodayJourney();
       setActiveJourney(todayJourney);
 
@@ -36,6 +36,8 @@ export function AppContent() {
 
   useEffect(() => {
     loadAppState();
+    window.addEventListener('rotapro-data-synced', loadAppState);
+    return () => window.removeEventListener('rotapro-data-synced', loadAppState);
   }, [loadAppState]);
 
   if (!isReady) {

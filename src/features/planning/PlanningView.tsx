@@ -44,11 +44,11 @@ export function PlanningView({
     const load = async () => {
       const clients = await clientRepository.getAll(false);
       setAllClients(clients);
-      if (clients.length > 0 && !selectedClientId) {
-        setSelectedClientId(clients[0].id);
-      }
+      setSelectedClientId(current => clients.some(c => c.id === current) ? current : clients[0]?.id || '');
     };
     load();
+    window.addEventListener('rotapro-data-synced', load);
+    return () => window.removeEventListener('rotapro-data-synced', load);
   }, []);
 
   const handleAddStop = () => {

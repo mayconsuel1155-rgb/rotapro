@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App from '../App';
 import { db, seedInitialDataIfEmpty } from '../db/database';
@@ -12,7 +12,7 @@ describe('RotaPro E2E Component & User Flow Tests', () => {
     await seedInitialDataIfEmpty();
   });
 
-  it('renders Dashboard with 100% Offline badge and seeded clients count', async () => {
+  it('renders Dashboard with local data badge and seeded clients count', async () => {
     render(<App />);
 
     // Wait for App to load past the loading spinner
@@ -20,7 +20,35 @@ describe('RotaPro E2E Component & User Flow Tests', () => {
       expect(screen.getByText(/Meu Dia de Trabalho/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/100% Offline/i)).toBeInTheDocument();
+    expect(screen.getByText(/Dados locais/i)).toBeInTheDocument();
+  });
+
+  it('keeps install available until the browser confirms installation', async () => {
+    render(<App />);
+    await screen.findByText(/Meu Dia de Trabalho/i);
+    const event = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
+      prompt: vi.fn().mockResolvedValue(undefined),
+      userChoice: Promise.resolve({ outcome: 'accepted' }),
+    });
+    fireEvent(window, event);
+    fireEvent.click(screen.getByRole('button', { name: 'Instalar App' }));
+    await screen.findByText(/Se o Android disser que não é possível instalar/i);
+    expect(screen.getByRole('button', { name: 'Instalar App' })).toBeInTheDocument();
+    fireEvent(window, new Event('appinstalled'));
+    expect(screen.queryByRole('button', { name: 'Instalar App' })).not.toBeInTheDocument();
+  });
+
+  it('shows recovery instructions if the browser installation prompt fails', async () => {
+    render(<App />);
+    await screen.findByText(/Meu Dia de Trabalho/i);
+    const event = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
+      prompt: vi.fn().mockRejectedValue(new Error('Install unavailable')),
+      userChoice: Promise.resolve({ outcome: 'dismissed' }),
+    });
+    fireEvent(window, event);
+    fireEvent.click(screen.getByRole('button', { name: 'Instalar App' }));
+    expect(await screen.findByText(/O navegador não conseguiu iniciar a instalação/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Instalar App' })).toBeInTheDocument();
   });
 
   it('navigates to Clientes tab, creates a new client and sees it in the list', async () => {
